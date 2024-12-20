@@ -70,7 +70,47 @@ void process(WFHttpTask *serverTask){
     }
     // 上传单个分块
     else if(method == "POST" && path == "/file/mupload/uppart"){
-        
+        // 上传单个分块
+        // 1.解析用户请求 提取出 uploadID和chkidx
+        // uploadID = MP_duan15:55&chkidx = 1
+        std::string uploadIDKV = query.substr(0, query.find("&"));
+        std::string chkidxKV = query.substr(query.find("&") + 1);
+        std::string uploadID = uploadIDKV.substr(uploadIDKV.find("=") + 1);
+        std::string chkidx = chkidxKV.substr(chkidx.find("=") + 1);
+        // 2.获取文件的hash，创建目录，写入分块
+        // HGET uploadID filehash
+        // 这里需要用到callback 因为要拿到filehash
+        auto redisTask = WFTaskFactory::create_redis_task("redis://127.0.0.1:6379", 2,[](WFRedisTask *redisTask){
+            protocol::RedisRequest *req = redisTask->get_req();
+            protocol::RedisResponse *resp = redisTask->get_resp();
+            int state = redisTask->get_state();
+            int error = redisTask->get_error();
+            protocol::RedisValue value;
+            switch (state){
+            case WFT_STATE_SYS_ERROR:
+                fprintf(stderr, "system error : %s\n", strerror(error));
+                break;
+            case WFT_STATE_DNS_ERROR:
+                fprintf(stderr, "dns error: %s\n", gai_strerror(error));
+                break;
+            case WFT_STATE_SUCCESS:
+                resp->get_result(value);
+                if(value.is_error()){
+                    fprintf(stderr, "redis error\n");
+                    state = WFT_STATE_TASK_ERROR;
+                }
+                break;
+            }
+            if(state != WFT_STATE_SUCCESS){
+                fprintf(stderr, "Failed\n");
+                return;
+            }
+            else{
+                fprintf(stderr, "Success!\n");
+            }
+        });
+        redisTask->get_req()->set_request("HGET", {uploadID, "filehash"});
+        // 3.写入分块完成之后，将上传的进度存入缓存中
     }
     else if(method == "GET" && path == "/file/mupload/complete"){
         
