@@ -53,6 +53,7 @@ void process(WFHttpTask *serverTask){
         uppartInfo["filesize"] = filesize;
         uppartInfo["chunksize"] = chunksize;
         uppartInfo["filehash"] = filehash;
+        uppartInfo["filename"] = filename;
         // 传回给客户端
         resp->append_output_body(uppartInfo.dump());
         // 5.将一些信息写入缓存
@@ -76,13 +77,13 @@ void process(WFHttpTask *serverTask){
         std::string uploadIDKV = query.substr(0, query.find("&"));
         std::string chkidxKV = query.substr(query.find("&") + 1);
         std::string uploadID = uploadIDKV.substr(uploadIDKV.find("=") + 1);
-        std::string chkidx = chkidxKV.substr(chkidx.find("=") + 1);
+        std::string chkidx = chkidxKV.substr(chkidxKV.find("=") + 1);
         // 2.获取文件的hash，创建目录，写入分块
         // HGET uploadID filehash
         // 这里需要用到callback 因为要拿到filehash
-        auto redisTask = WFTaskFactory::create_redis_task("redis://127.0.0.1:6379", 2,[](WFRedisTask *redisTask){
-            protocol::RedisRequest *req = redisTask->get_req();
-            protocol::RedisResponse *resp = redisTask->get_resp();
+        auto redisTaskHGET = WFTaskFactory::create_redis_task("redis://127.0.0.1:6379", 2,[chkidx, req](WFRedisTask *redisTask){
+            protocol::RedisRequest *redisReq = redisTask->get_req();
+            protocol::RedisResponse *redisResp = redisTask->get_resp();
             int state = redisTask->get_state();
             int error = redisTask->get_error();
             protocol::RedisValue value;
@@ -94,7 +95,7 @@ void process(WFHttpTask *serverTask){
                 fprintf(stderr, "dns error: %s\n", gai_strerror(error));
                 break;
             case WFT_STATE_SUCCESS:
-                resp->get_result(value);
+                redisResp->get_result(value);
                 if(value.is_error()){
                     fprintf(stderr, "redis error\n");
                     state = WFT_STATE_TASK_ERROR;
@@ -102,18 +103,78 @@ void process(WFHttpTask *serverTask){
                 break;
             }
             if(state != WFT_STATE_SUCCESS){
-                fprintf(stderr, "Failed\n");
+                // fprintf(stderr, "Failed\n");
                 return;
             }
             else{
-                fprintf(stderr, "Success!\n");
+                // fprintf(stderr, "Success!\n");
+            }
+            // 拿到文件的hash值
+            std::string filehash = value.string_value();
+            mkdir(filehash.c_str(), 0777);
+            std::string filepath = filehash + "/" + chkidx;
+            // 创建并打开这个空文件
+            int fd = open(filepath.c_str(), O_RDWR | O_CREAT, 0666);
+            // 将文件内容进行写入
+            const void *body;
+            size_t size;
+            req->get_parsed_body(&body, &size);
+            fprintf(stderr, "body = %s\nsize = %ld\n", (char *)body, size);
+            write(fd, body, size);
+            close(fd);
+        });
+        redisTaskHGET->get_req()->set_request("HGET", {uploadID, "filehash"});
+        // 这里不能使用start  不然在获取body的时候 有可能redisTask没有结束 但是serverTask已经结束啦
+        // redisTask和serverTask是并行的
+        // redisTask->start();
+        series_of(serverTask)->push_back(redisTaskHGET);
+        // 3.写入分块完成之后，将上传的进度存入缓存中
+        auto redisTaskHSET = WFTaskFactory::create_redis_task("redis://127.0.0.1:6379", 2, nullptr);
+        redisTaskHSET->get_req()->set_request("HSET", {uploadID, "chkidx_"+chkidx, "1"});
+        series_of(serverTask)->push_back(redisTaskHSET);
+        // 4.回复响应
+        resp->append_output_body("OK");
+    }
+    // 合并分块
+    else if(method == "GET" && path == "/file/mupload/complete"){
+        // 1 解析用户请求 提取出uploadID
+        std::string uploadID = query.substr(query.find("=") + 1);
+        // 2 根据uploadID查询进度  HGETALL uploadID
+        auto redisTask = WFTaskFactory::create_redis_task("redis://127.0.0.1:6379", 2, [resp](WFRedisTask *redisTask){
+            protocol::RedisRequest *redisReq = redisTask->get_req();
+            protocol::RedisResponse *redisResp = redisTask->get_resp();
+            protocol::RedisValue value;
+            redisResp->get_result(value);
+            // 3 找到chunkcount对应的值
+            int chunkcount;
+            int chunknow = 0;
+            // 一定是偶数  因为是K-V K-V K-V
+            for(int i = 0; i < value.arr_size(); i+=2){
+                std::string key = value.arr_at(i).string_value();
+                std::string val = value.arr_at(i + 1).string_value();
+                if(key == "chunkcount"){
+                    // atoi(val.c_str());
+                    chunkcount = std::stoi(val);
+                }
+                // 4 找到chkidx_*对应的数量
+                // 前缀匹配
+                else if(key.substr(0, 7) == "chkidx_"){
+                    // 当前已上传的数量++
+                    chunknow++;
+                }
+            }
+            fprintf(stderr,"chunkcount = %d\nchunknow = %d\n", chunkcount, chunknow);
+            // 比较大小
+            if(chunkcount == chunknow){
+                resp->append_output_body("SUCCESS");
+            }
+            else{
+                resp->append_output_body("FAIL");
             }
         });
-        redisTask->get_req()->set_request("HGET", {uploadID, "filehash"});
-        // 3.写入分块完成之后，将上传的进度存入缓存中
-    }
-    else if(method == "GET" && path == "/file/mupload/complete"){
-        
+        redisTask->get_req()->set_request("HGETALL", {uploadID});
+        series_of(serverTask)->push_back(redisTask);
+        // 5 先不写具体合并
     }
 }
 
