@@ -1,8 +1,77 @@
 #include "linuxheader.h"
 #include <workflow/WFFacilities.h>
 #include <wfrest/HttpServer.h>
+#include <workflow/MySQLUtil.h>
+#include <workflow/MySQLResult.h>
+#include <workflow/MySQLMessage.h>
 static WFFacilities::WaitGroup waitGroup(1);
 // wfrest框架
+void callback(WFMySQLTask *mysqlTask){
+    // 检查连接错误
+    if(mysqlTask->get_state() != WFT_STATE_SUCCESS){
+        fprintf(stderr, "error msg:%s\n", WFGlobal::get_error_string(mysqlTask->get_state(), mysqlTask->get_error()));
+        return;
+    }
+    // 查看指令是否执行成功  拿到响应
+    protocol::MySQLResponse *resp = mysqlTask->get_resp();
+    // cursor迭代器 遍历resp
+    protocol::MySQLResultCursor cursor(resp);
+
+    // 获取报错类型
+    // 检查语法错误
+    if(resp->get_packet_type() == MYSQL_PACKET_ERROR){
+        fprintf(stderr, "error_code = %d msg = %s\n", resp->get_error_code(), resp->get_error_msg().c_str());
+    }
+    do{
+        if(cursor.get_cursor_status() == MYSQL_STATUS_OK){
+        // 写指令，执行成功
+        fprintf(stderr, "OK. %llu rows affected. %d warnings. insert_id = %llu.\n", cursor.get_affected_rows(), cursor.get_warnings(), cursor.get_insert_id());
+        }
+        else if(cursor.get_cursor_status() == MYSQL_STATUS_GET_RESULT){
+            // 读指令，执行成功
+            // 1.域的数量，名字，类型
+            // 2.若干个cell ---> 一行     若干行 ---> 表
+            // vector<vector<cells>>
+            // 把所有域信息构成一个数组
+            const protocol::MySQLField *const *fields = cursor.fetch_fields();
+            // 访问所有列数
+            for(int i = 0; i < cursor.get_field_count(); ++i){
+                // db table name type
+                fprintf(stderr, "db = %s, table = %s, name = %s, type = %s\n", fields[i]->get_db().c_str(), 
+                                                                               fields[i]->get_table().c_str(),
+                                                                               fields[i]->get_name().c_str(),
+                                                                               datatype2str(fields[i]->get_data_type()));                                    
+            }
+
+            // 全部取出来
+            // cursor.fetch_all();
+            std::vector<std::vector<protocol::MySQLCell>> rows;
+            cursor.fetch_all(rows);
+            // 遍历二维数组
+            for(auto &row : rows){
+                for(auto &cell : row){
+                    if(cell.is_int()){
+                        printf("[%d]", cell.as_int());
+                    }
+                    else if(cell.is_ulonglong()){
+                        printf("[%llu]", cell.as_ulonglong());
+                    }
+                    else if(cell.is_string()){
+                        printf("[%s]", cell.as_string().c_str());
+                    }
+                    else if(cell.is_datetime()){
+                        printf("[%s]", cell.as_datetime().c_str());
+                    }
+                }
+                printf("\n");
+            }
+            // 把每一行取出来
+            // cursor.fetch_row();
+        }
+    } while(cursor.next_result_set());
+    wfrest::HttpResp *resp2client = static_cast<wfrest::HttpResp *>(series_of(mysqlTask)->get_context());
+    resp2client->String("Mysql OK");
+}
 void sigHandler(int num){
     waitGroup.done();
     fprintf(stderr, "wait group is done\n");
@@ -84,6 +153,27 @@ int main(){
                                                                                             it.second.first.c_str(),
                                                                                             it.second.second.c_str());
         }
+    });
+    // wfrest中的序列
+    server.GET("/series", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
+        // series就是服务端任务所在的序列
+        auto timerTask = WFTaskFactory::create_timer_task(5 * 1000000, [resp](WFTimerTask *timerTask){
+            resp->String("time is over");
+        });
+        // 将timerTask加入序列
+        series->push_back(timerTask);
+        // timerTask->start();  // 不行的
+    });
+    // mysql
+    server.GET("/mysql0", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
+        auto mysqlTask = WFTaskFactory::create_mysql_task("mysql://root:123456@127.0.0.1:3306", 0, callback);
+        std::string sql = "insert into cloudisk.tbl_user_token (user_name, user_token) values ('test7', 'adwqefwefgwegwgwg');"
+        "select * from cloudisk.tbl_user_token;";
+        auto mysqlReq = mysqlTask->get_req();
+        mysqlReq->set_query(sql);
+        series->push_back(mysqlTask);
+        // 把resp传递过去 在回调中使用
+        series->set_context(resp);
     });
     // .track() 打印出运行的状态
     if(server.track().start(1234) == 0){
