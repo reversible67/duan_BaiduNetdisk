@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload and Download</title>
+</head>
+<body>
+    <h1>File Upload and Download</h1>
+
+    <!-- Upload Section -->
+    <h2>Upload a File</h2>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" />
+        <button type="button" onclick="uploadFile()">Upload</button>
+    </form>
+    <p id="uploadStatus"></p>
+
+    <!-- Download Section -->
+    <h2>Download a File</h2>
+    <a id="downloadLink" href="#" download>Click here to download</a>
+
+    <script>
+        // Upload function
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const uploadStatus = document.getElementById('uploadStatus');
+
+            if (fileInput.files.length === 0) {
+                uploadStatus.textContent = 'No file selected.';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Simulate file upload (you can replace this with a real API call)
+            setTimeout(() => {
+                uploadStatus.textContent = `File "${file.name}" uploaded successfully.`;
+            }, 1000);
+        }
+
+        // Set download file
+        const downloadLink = document.getElementById('downloadLink');
+        const sampleData = new Blob(['This is a sample file content.'], { type: 'text/plain' });
+        downloadLink.href = URL.createObjectURL(sampleData);
+    </script>
+</body>
+</html>
