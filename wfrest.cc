@@ -4,7 +4,9 @@
 #include <workflow/MySQLUtil.h>
 #include <workflow/MySQLResult.h>
 #include <workflow/MySQLMessage.h>
+#include <nlohmann/json.hpp>
 static WFFacilities::WaitGroup waitGroup(1);
+using Json = nlohmann::json;
 // wfrest框架
 void callback(WFMySQLTask *mysqlTask){
     // 检查连接错误
@@ -174,6 +176,47 @@ int main(){
         series->push_back(mysqlTask);
         // 把resp传递过去 在回调中使用
         series->set_context(resp);
+    });
+    // 方便使用的mysql接口
+    server.GET("/mysql1", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        resp->MySQL("mysql://root:123456@127.0.0.1:3306", "SHOW DATABASES; SELECT * FROM cloudisk.tbl_user_token;");
+    });
+    // 希望先可以处理数据 过一段时间再回复客户端
+    /*server.GET("/mysql2", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        std::string url = "mysql://root:123456@127.0.0.1:3306";
+        std::string sql = "SHOW DATABASES; SELECT * FROM cloudisk.tbl_user_token;";
+        // 第三个参数填一个回调函数
+        resp->MySQL(url, sql, [resp](Json *pjson){
+            // pjson 指向搜集结果的json对象
+            std::string info = (*pjson)["result_set"][0]["databases"];
+            resp->String(info);
+        });
+    });
+    */
+    server.GET("/mysql3", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        std::string url = "mysql://root:123456@127.0.0.1:3306";
+        std::string sql = "SHOW DATABASES; SELECT * FROM cloudisk.tbl_user_token;";
+        resp->MySQL(url, sql, [](protocol::MySQLResultCursor *cursor){
+            std::vector<std::vector<protocol::MySQLCell>> rows;
+            cursor->fetch_all(rows);
+            for(auto &row : rows){
+                for(auto &cell : row){
+                    if(cell.is_int()){
+                        printf("[%d]", cell.as_int());
+                    }
+                    else if(cell.is_ulonglong()){
+                        printf("[%llu]", cell.as_ulonglong());
+                    }
+                    else if(cell.is_string()){
+                        printf("[%s]", cell.as_string().c_str());
+                    }
+                    else if(cell.is_datetime()){
+                        printf("[%s]", cell.as_datetime().c_str());
+                    }
+                }
+                printf("\n");
+            }
+        });
     });
     // .track() 打印出运行的状态
     if(server.track().start(1234) == 0){
