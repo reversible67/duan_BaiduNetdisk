@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>六七网盘</title>
+    <style type="text/css">
+      .outSide{margin-top: 15px;}
+    </style>
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://cdn.bootcss.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+      <script src="https://cdn.bootcss.com/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class='container outSide'>
+      <div class='row'>
+        <div class='col-md-3 col-md-offset-1'>
+          <input type='button' class='btn btn-default btn-primary btn-myBtn' value='登录/注册' data-toggle="modal" data-target=".abc">
+          <p class='namesNode hide'>欢迎回来<span></span></p> 
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class='container fileShowNode hide'>
+      <table class='table text-center table-hover'>
+        <thead>
+          <tr>
+            <td>序号</td>
+            <td>文件名</td>
+            <td>文件大小</td>
+            <td>上传时间</td>
+            <td>下载次数</td>
+            <td>是否删除</td>
+          </tr>
+        </thead>
+        <tbody>
+        <!--
+          <tr>
+            <td>1</td>
+            <td>asjdals.jpg</td>
+            <td>21mb</td>
+            <td>2017/22</td>
+            <td>0</td>
+            <td><input type="button" name="" class='btn btn-default btn-danger btn-xs' value='删除'></td>
+          </tr>
+        -->
+        </thead>
+
+      </table>
+
+      <form class='form-inline'>
+        <div class='form-group'>
+          <input type="file" name="" class='fsNode'>
+          
+        </div>
+        <div class='form-group'>
+          <input type="button" name="" class='btn btn-default btn-primary btn-xs btn-setFiles' value="上传文件" data-toggle="modal" data-target=".bbb">
+        </div>
+      </form>
+      
+
+
+    </div>
+
+
+
+    <div class="modal fade bbb" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title">信息栏</h4>
+          </div>
+          <div class="modal-body bodytextNode">
+            <p>One fine body&hellip;</p>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+
+
+    <div class="modal fade abc" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title">注册登录框</h4>
+          </div>
+          <div class="modal-body">
+            <form class='myForm'>
+              <div class='form-group'>
+                <label>用户名</label>
+                <input type="" name="" class='form-control userNode'>
+              </div>
+              <div class='form-group'>
+                <label>密码</label>
+                <input type="password" name="" class='form-control passNode'>
+              </div>
+              <input type="button" name="" value='登录' class='btn btn-default btn-primary btn-loginNode' >
+              <input type="button" name="" value='注册' class='btn btn-default btn-info btn-res' >
+            </form>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+    
+    <script src="js/jq.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script type="text/javascript">
+    //this js for leo
+
+    (()=>{
+      let index = 1;
+      $('.btn-myBtn').on({
+        click(){
+          $('.myForm .form-group').removeClass('has-error');
+          $('.userNode').val('');
+          $('.passNode').val('');
+
+        }
+      });
+
+
+      function toTr(index,filesName,size,timer,download,hash){
+        var oTr = document.createElement('tr');
+        $(oTr).attr('hash',hash);
+        oTr.innerHTML = `
+            <td>${index}</td>
+            <td>${filesName}</td>
+            <td>${size}</td>
+            <td>${timer}</td>
+            <td>${download}</td>
+            <td><input type='button' class='btn btn-default btn-danger btn-xs btn-deleteNode' value='删除' data-toggle="modal" data-target=".bbb"></td>`;
+
+        return oTr;
+      }
+
+
+      // 删除文件
+      $('body').on({
+        'click':function(){
+          var _this = this;
+          $.ajax({
+            url:'http://localhost:9111/login/removeFile',
+            type:'get',
+            data:{
+              user:$('.userNode').val(),
+              hash:$(_this.parentNode.parentNode).attr('hash')
+            },
+            success:function(data){
+              //console.log(data)
+              if(data.ok==1){
+               // $('.abc').modal('toggle');
+                $('.bodytextNode p').html(data.msg);
+                _this.parentNode.parentNode.remove();
+
+              }
+              else{
+                $('.bodytextNode p').html(data.msg);
+              }
+            }
+          })
+        }
+      },'.btn-deleteNode')
+
+
+      // 上传文件
+      $('.btn-setFiles').on({
+        'click':function(){
+          var FromNode = new FormData();
+          console.log($('.fsNode')[0].files[0])
+          FromNode.append('files',$('.fsNode')[0].files[0]);
+          FromNode.append('Fsnames',$('.userNode').val());
+
+          var xhr = new XMLHttpRequest();
+          xhr.open('post','http://localhost:9111/login/getfiles',true);
+
+          xhr.send(FromNode);
+
+          xhr.onload = function(){
+            var json = eval('('+xhr.responseText+')');
+            //index,filesName,size,timer,download,hash
+            if(json.ok == 1){
+              $('.bodytextNode p').html('恭喜您~上传成功');
+              $('.fileShowNode tbody')[0].appendChild(toTr(index,$('.fsNode')[0].files[0].name,($('.fsNode')[0].files[0].size/1024).toFixed(2)+'KB',json.timer,0,json.hash));
+              index++;
+
+            }
+            else{
+              $('.bodytextNode p').html(json.msg);
+            }
+            $('.fsNode').val('');
+
+
+
+          }
+        }
+      })
+      // 登录
+      $('.btn-loginNode').on({
+        click(){
+          $.ajax({
+            url:'http://localhost:9111/login/login',
+            type:'get',
+            data:{
+              'user':$('.userNode').val(),
+              'pass':$('.passNode').val()
+            },
+            success:function(data){
+              //console.log(data)
+              if(data.ok==1){
+                //alert(data.msg);
+                $('.abc').modal('toggle');
+                $('.btn-myBtn').hide();
+                $('.namesNode').removeClass('hide');
+                $('.namesNode span').html($('.userNode').val());
+                $('.fileShowNode').removeClass('hide');
+
+
+                //$('.fileShowNode tbody')[0].appendChild(toTr(index,$('.fsNode')[0].files[0].name,$('.fsNode')[0].files[0].size/1024+'KB',json.timer,0,json.hash));
+
+                //[{},{},{}]
+                for(var i = 0;i < data.data.length;i++){
+                  $('.fileShowNode tbody')[0].appendChild(toTr(index,data.data[i].LastName,(data.data[i].size/1024).toFixed(2)+'KB',data.data[i].lastTime,data.data[i].download,data.data[i].hashName));
+                  index++;
+                }
+              }
+              else{
+                alert(data.msg);
+                $('.myForm .form-group').addClass('has-error');
+              }
+            }
+          })
+        }
+      });
+      // 注册
+      $('.btn-res').on({
+        click(){
+          $.ajax({
+            url:'http://localhost:9111/login/res',
+            type:'get',
+            data:{
+              'user':$('.userNode').val(),
+              'pass':$('.passNode').val()
+            },
+            success:function(data){
+              if(data.ok==1){
+                alert(data.msg);
+               // $('.abc').modal('toggle');
+              }
+              else{
+                alert(data.msg);
+                $('.myForm .form-group').addClass('has-error');
+              }
+            }
+          })
+
+
+
+        }
+      })
+
+    })();
+    // ------ 
+    </script>
+  </body>
+</html>
