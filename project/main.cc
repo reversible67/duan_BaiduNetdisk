@@ -17,7 +17,7 @@ int main(){
     wfrest::HttpServer server;
     // 显示上传界面
     server.GET("/file/upload", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
-        resp->File("static/view/index.html");
+        resp->File("./static/view/index.html");
     });
     // 上传文件
     server.POST("/file/upload",[](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
@@ -27,7 +27,7 @@ int main(){
         auto fileInfo = form["file"];
         // fileInfo.first = 文件名  fileInfo.second = 文件内容
         // tmp目录存放所有文件  以及用于生成文件路径
-        std::string filepath = "tmp/" + fileInfo.first;
+        std::string filepath = "./tmp/" + fileInfo.first;
         // 通过open系统调用进行创建文件
         // 加上O_EXCL 上传重复文件会报错
         int fd = open(filepath.c_str(), O_RDWR | O_CREAT | O_EXCL, 0666);
