@@ -5,6 +5,8 @@
 #include <workflow/MySQLResult.h>
 #include <workflow/MySQLMessage.h>
 #include <nlohmann/json.hpp>
+#include "FileUtil.h"
+#include <wfrest/HttpMsg.h>
 static WFFacilities::WaitGroup waitGroup(1);
 void callback(WFMySQLTask *mysqlTask){
 }
@@ -51,6 +53,20 @@ int main(){
         //                                                                                     it.second.first.c_str(),
         //                                                                                     it.second.second.c_str());
         // }
+
+
+        // fprintf(stderr, "sha1 = %s\n", FileUtil::sha1File(filepath.c_str()).c_str());
+
+        std::string sql = "INSERT INTO cloudisk.tbl_file (file_sha1,file_name, file_size, file_addr, status) VALUES('" 
+                + FileUtil::sha1File(filepath.c_str()) + "',' "
+                + fileInfo.first + "',"
+                + std::to_string(fileInfo.second.size()) + ",'"
+                + filepath + "', 0)";
+        // fprintf(stderr, "sql = %s\n", sql.c_str());
+        using Json = nlohmann::json;
+        resp->MySQL("mysql://root:123456@localhost", sql, [](Json *pjson){
+            fprintf(stderr, "out = %s\n", pjson->dump().c_str());
+        });
         // 如果上传成功啦  设置302（重定向）
         resp->set_status_code("302");
         // 把location所对应的键值改为 /file/upload/success
@@ -96,6 +112,31 @@ int main(){
         resp->set_status_code("302");
         resp->headers["Location"] = "http://1.94.50.145:1235/" + filename;
     });*/
+    // 引入数据库 数据库需要哪些表呢？
+    // 1.全局文件表   把所有的文件信息记录下来  文件名 文件哈希值 文件大小 文件位置... tbl_file
+    /*
+    分库分表和主从复制应用场景
+    分库分表是为了应对数据量过大的挑战
+    主从复制是为了提高读性能，提供容错功能，提高可用性
+    */
+    // 可以把表垂直分裂 常用的信息放在tb1 不常用的放在tb2
+    /*
+    垂直分片的优点：
+    1.提高查询性能：只查询所需的字段，减少了数据的读取和传输量，提高了查询效率。 
+    2.减少冗余数据：每个数据库或表只包含相关的数据，避免了存储冗余字段的开销。 3.
+    降低数据库负载：将不同业务关联性不强的表分散到不同的数据库中，可以降低单一数据库的负载压力，提高数据库的并发处理能力。
+    垂直分片的缺点：
+    1.部分时候查询效率低 需要join
+    */
+    /*
+    水平分片：两个表结构是一样的  若干行属于tb1  若干行属于tb2
+    可以解决数据量过大的问题
+    */
+    // 2.用户表  tbl_user
+    // 3.用户文件表  tbl_user_file
+    // 4.token表   每一次登录以后  给客户端一个凭证  用于服务端校正你有没有这个资格  token有效时间：1个星期-1个月 最好放入redis EXPIRE指令
+
+
     if(server.track().start(1234) == 0){
         server.list_routes();
         waitGroup.wait();
