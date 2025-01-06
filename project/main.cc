@@ -64,9 +64,9 @@ int main(){
                 + filepath + "', 0)";
         // fprintf(stderr, "sql = %s\n", sql.c_str());
         using Json = nlohmann::json;
-        resp->MySQL("mysql://root:123456@localhost", sql, [](Json *pjson){
-            fprintf(stderr, "out = %s\n", pjson->dump().c_str());
-        });
+        // resp->MySQL("mysql://root:123456@localhost", sql, [](Json *pjson){
+        //     fprintf(stderr, "out = %s\n", pjson->dump().c_str());
+        // });
         // 如果上传成功啦  设置302（重定向）
         resp->set_status_code("302");
         // 把location所对应的键值改为 /file/upload/success
@@ -135,7 +135,69 @@ int main(){
     // 2.用户表  tbl_user
     // 3.用户文件表  tbl_user_file
     // 4.token表   每一次登录以后  给客户端一个凭证  用于服务端校正你有没有这个资格  token有效时间：1个星期-1个月 最好放入redis EXPIRE指令
+    // 注册界面
+    server.GET("/user/signup", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        resp->File("static/view/signup.html");
+    });
+    server.POST("/usr/signup", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
+        // 1.按urlencoded的形式去解析post报文体
+        std::map<std::string, std::string> &form_kv = req->form_kv();
+        std::string username = form_kv["username"];
+        std::string password = form_kv["password"];
+        // 2.把密码进行加密
+        std::string salt = "12345678";
+        char *encryptPassword = crypt(password.c_str(), salt.c_str());
+        fprintf(stderr, "encryptPassword = %s\n", encryptPassword);
+        // 3.把用户信息插入到数据库
+        std::string sql = "INSERT INTO cloudisk.tbl_user (user_name, user_pwd) VALUES ('"+ username + "', '" + encryptPassword + "');";
+        fprintf(stderr, "sql = %s\n", sql.c_str());
+        // create_mysql_task
+        auto mysqlTask = WFTaskFactory::create_mysql_task("mysql://root:123456@localhost", 0, [](WFMySQLTask *mysqlTask){
+            // 4.回复一个SUCCESS给前端
+            wfrest::HttpResp *resp2client = static_cast<wfrest::HttpResp *>(mysqlTask->user_data);
+            if(mysqlTask->get_state() != WFT_STATE_SUCCESS){
+                fprintf(stderr, "error msg:%s\n", WFGlobal::get_error_string(mysqlTask->get_state(), mysqlTask->get_error()));
+                
+                resp2client->append_output_body("FAIL", 4);
+                return;
+            }
+            // 查看指令是否执行成功  拿到响应
+            protocol::MySQLResponse *resp = mysqlTask->get_resp();
+            protocol::MySQLResultCursor cursor(resp);
+            // 获取报错类型
+            // 检查语法错误
+            if(resp->get_packet_type() == MYSQL_PACKET_ERROR){
+                fprintf(stderr, "error_code = %d msg = %s\n", resp->get_error_code(), resp->get_error_msg().c_str());
+                resp2client->append_output_body("FAIL", 4);
+                return;
+            }
 
+            if(cursor.get_cursor_status() == MYSQL_STATUS_OK){
+                // 写指令，执行成功
+                fprintf(stderr, "OK. %llu rows affected. %d warnings. insert_id = %llu.\n", cursor.get_affected_rows(), cursor.get_warnings(), cursor.get_insert_id());
+                if(cursor.get_affected_rows() == 1){
+                    resp2client->append_output_body("SUCCESS", 7);
+                    return;
+                }
+            }
+        });
+        mysqlTask->get_req()->set_query(sql);
+        mysqlTask->user_data = resp;
+        // push_back
+        series->push_back(mysqlTask);
+    });
+    server.GET("/static/view/signin.html", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        resp->File("static/view/signin.html");
+    });
+    server.GET("/static/view/home.html", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        resp->File("static/view/home.html");
+    });
+    server.GET("/static/js/auth.js", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        resp->File("static/js/auth.js");
+    });
+    server.GET("/static/img/avatar.jepg", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        resp->File("static/img/avatar.jepg");
+    });
 
     if(server.track().start(1234) == 0){
         server.list_routes();
