@@ -198,6 +198,15 @@ int main(){
     server.GET("/static/img/avatar.jepg", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         resp->File("static/img/avatar.jepg");
     });
+    server.POST("/user/signin", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        // 1.解析用户请求
+        std::map<std::string, std::string> &form_kv = req->form_kv();
+        std::string username = form_kv["username"];
+        std::string password = form_kv["password"];
+        // 2.查询数据库
+        // 3.生成一个token，存入数据库中
+        // 4.将信息包装成Json 返回给客户端
+    });
 
     if(server.track().start(1234) == 0){
         server.list_routes();
