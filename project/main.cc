@@ -7,7 +7,10 @@
 #include <nlohmann/json.hpp>
 #include "FileUtil.h"
 #include <wfrest/HttpMsg.h>
+#include "UserInfo.h"
+#include "Token.h"
 static WFFacilities::WaitGroup waitGroup(1);
+using Json = nlohmann::json;
 void callback(WFMySQLTask *mysqlTask){
 }
 void sigHandler(int num){
@@ -63,7 +66,6 @@ int main(){
                 + std::to_string(fileInfo.second.size()) + ",'"
                 + filepath + "', 0)";
         // fprintf(stderr, "sql = %s\n", sql.c_str());
-        using Json = nlohmann::json;
         // resp->MySQL("mysql://root:123456@localhost", sql, [](Json *pjson){
         //     fprintf(stderr, "out = %s\n", pjson->dump().c_str());
         // });
@@ -139,7 +141,7 @@ int main(){
     server.GET("/user/signup", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         resp->File("static/view/signup.html");
     });
-    server.POST("/usr/signup", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
+    server.POST("/user/signup", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
         // 1.按urlencoded的形式去解析post报文体
         std::map<std::string, std::string> &form_kv = req->form_kv();
         std::string username = form_kv["username"];
@@ -198,14 +200,79 @@ int main(){
     server.GET("/static/img/avatar.jepg", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         resp->File("static/img/avatar.jepg");
     });
-    server.POST("/user/signin", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+    server.POST("/user/signin", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
         // 1.解析用户请求
         std::map<std::string, std::string> &form_kv = req->form_kv();
         std::string username = form_kv["username"];
         std::string password = form_kv["password"];
         // 2.查询数据库
-        // 3.生成一个token，存入数据库中
-        // 4.将信息包装成Json 返回给客户端
+        std::string url = "mysql://root:123456@localhost";
+        std::string sql = "SELECT user_pwd FROM cloudisk.tbl_user WHERE user_name = '" + username + "' LIMIT 1;";
+        auto readTask = WFTaskFactory::create_mysql_task(url, 0, [](WFMySQLTask *readTask){
+            // 提取readTask的结果
+            auto resp = readTask->get_resp();
+            // 作为迭代器 获取结果
+            protocol::MySQLResultCursor cursor(resp);
+
+            std::vector<std::vector<protocol::MySQLCell>> rows;
+            cursor.fetch_all(rows);
+
+            // 数据库中的密码
+            std::string nowPassword = rows[0][0].as_string();
+            fprintf(stderr, "nowPassword = %s\n", nowPassword.c_str());
+
+            UserInfo *userinfo = static_cast<UserInfo *>(series_of(readTask)->get_context());
+            // 用户输入的密码
+            char * inPassword = crypt(userinfo->password.c_str(), "12345678");
+            fprintf(stderr, "inPassword = %s\n", inPassword);
+            if(strcmp(nowPassword.c_str(), inPassword) != 0){
+                userinfo->resp->append_output_body("FAIL", 4);
+                return;
+            }
+            // 3.生成一个token，存入数据库中
+            // 根据用户的信息 经过加密得到密文  拼接上登陆时间 合在一起就是token
+            // 盐值固定 为12345678
+            Token usertoken(userinfo->username, "12345678");
+            fprintf(stderr, "token = %s\n", usertoken.token.c_str());
+            userinfo->token = usertoken.token;
+            // 存入数据库当中
+            std::string url = "mysql://root:123456@localhost";
+            // replace 相当于 insert 和 update的结合
+            std::string sql = "REPLACE INTO cloudisk.tbl_user_token (user_name, user_token) VALUES ('" 
+                + userinfo->username + "', '" 
+                + usertoken.token + "');";
+            auto writeTask = WFTaskFactory::create_mysql_task(url, 0, [readTask](WFMySQLTask *writeTask){
+                // 这里没有做检查  假设成功
+                // // 4.将信息包装成Json 返回给客户端
+                UserInfo *userinfo = static_cast<UserInfo *>(series_of(readTask)->get_context());
+                Json uinfo;
+                uinfo["Username"] = userinfo->username;
+                uinfo["Token"] = userinfo->token;
+                uinfo["Location"] = "/static/view/home.html";
+                Json respInfo;
+                respInfo["code"] = 0;
+                respInfo["msg"] = "OK";
+                respInfo["data"] = uinfo;
+                userinfo->resp->String(respInfo.dump());
+            });
+            writeTask->get_req()->set_query(sql);
+            series_of(readTask)->push_back(writeTask);
+        });
+        readTask->get_req()->set_query(sql);
+        series->push_back(readTask);
+        UserInfo *userinfo = new UserInfo;
+        userinfo->username = username;
+        userinfo->password = password;
+        userinfo->resp = resp;
+        series->set_context(userinfo);
+        // 在序列的回调函数中释放
+        series->set_callback([](const SeriesWork *series){
+            // delete;
+            UserInfo *userinfo = static_cast<UserInfo *> (series_of(series)->get_context());
+            delete userinfo;
+            fprintf(stderr, "userinfo is deleted\n");
+        });
+        
     });
 
     if(server.track().start(1234) == 0){
