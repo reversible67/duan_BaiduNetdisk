@@ -26,6 +26,9 @@ int main(){
     });
     // 上传文件
     server.POST("/file/upload",[](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
+        // 从URL中提取用户名的信息
+        auto userInfo = req->query_list();
+        std::string username = userInfo["username"];
         // 读取文件内容 解析form-data类型的请求报文
         using Form = std::map<std::string, std::pair<std::string, std::string>>;
         Form &form = req->form();
@@ -65,10 +68,15 @@ int main(){
                 + fileInfo.first + "',"
                 + std::to_string(fileInfo.second.size()) + ",'"
                 + filepath + "', 0)";
-        // fprintf(stderr, "sql = %s\n", sql.c_str());
-        // resp->MySQL("mysql://root:123456@localhost", sql, [](Json *pjson){
-        //     fprintf(stderr, "out = %s\n", pjson->dump().c_str());
-        // });
+        sql += "INSERT INTO cloudisk.tbl_user_file (user_name, file_sha1, file_name, file_size) VALUES ('"
+                + username + "','"
+                + FileUtil::sha1File(filepath.c_str()) + "','"
+                + fileInfo.first + "',"
+                + std::to_string(fileInfo.second.size()) + ");";
+        fprintf(stderr, "sql = %s\n", sql.c_str());
+        resp->MySQL("mysql://root:123456@localhost", sql, [](Json *pjson){
+            fprintf(stderr, "out = %s\n", pjson->dump().c_str());
+        });
         // 如果上传成功啦  设置302（重定向）
         resp->set_status_code("302");
         // 把location所对应的键值改为 /file/upload/success
@@ -274,7 +282,71 @@ int main(){
         });
         
     });
-
+    // 用来刷新 查询用户信息
+    server.POST("/user/info", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
+        // 查询用户信息需要用到数据库 所以需要mysql任务
+        // 1 解析用户请求
+        auto userInfo = req->query_list();
+        // 2 校验token是否合法 ---> 拦截器
+        // 3 根据用户信息，查询sql
+        std::string sql = "SELECT user_name, signup_at FROM cloudisk.tbl_user WHERE user_name='" 
+                          + userInfo["username"] + "' LIMIT 1;";
+        auto mysqlTask = WFTaskFactory::create_mysql_task("mysql://root:123456@localhost", 0, [resp](WFMySQLTask *mysqlTask){
+            auto respMysql = mysqlTask->get_resp();
+            // 作为迭代器 获取结果
+            protocol::MySQLResultCursor cursor(respMysql);
+            std::vector<std::vector<protocol::MySQLCell>> rows;
+            cursor.fetch_all(rows);
+            fprintf(stderr, "username = %s, signupat = %s\n", rows[0][0].as_string().c_str(), rows[0][1].as_datetime().c_str());
+            Json uInfo;
+            uInfo["Usernam"] = rows[0][0].as_string();
+            uInfo["SignupAt"] = rows[0][1].as_datetime();
+            Json respInfo;
+            respInfo["data"] = uInfo;
+            respInfo["code"] = 0;
+            respInfo["msg"] = "OK";
+            // 返回给用户  这样页面就能弹出用户的信息
+            resp->String(respInfo.dump());
+        });
+        mysqlTask->get_req()->set_query(sql);
+        series->push_back(mysqlTask);
+    });
+    server.POST("/file/query", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
+        // 解析用户请求
+        auto userInfo = req->query_list();
+        std::string username = userInfo["username"];
+        auto form_kv = req->form_kv();
+        std::string limit = form_kv["limit"];
+        // 根据用户名查tbl_user_file
+        std::string sql = "SELECT file_sha1,file_name,file_size,upload_at,last_update FROM cloudisk.tbl_user_file WHERE user_name = '"
+                          + username + "' LIMIT " + limit + ";";
+        fprintf(stderr, "sql = %s\n", sql.c_str());
+        auto mysqlTask = WFTaskFactory::create_mysql_task("mysql://root:123456@localhost", 0, [resp](WFMySQLTask *mysqlTask){
+            auto respMysql = mysqlTask->get_resp();
+            protocol::MySQLResultCursor cursor(respMysql);
+            std::vector<std::vector<protocol::MySQLCell>> rows;
+            cursor.fetch_all(rows);
+            Json respArr;
+            for(auto &row : rows){
+                Json fileJson;
+                // row[0] file_sha1
+                fileJson["FileHash"] = row[0].as_string();
+                // row[1] file_name
+                fileJson["FileName"] = row[1].as_string();
+                // row[2] file_size
+                fileJson["FileSize"] = row[2].as_ulonglong();
+                // row[3] upload_at
+                fileJson["UploadAt"] = row[3].as_datetime();
+                // row[4] lastupdate
+                fileJson["LastUpdated"] = row[4].as_datetime();
+                respArr.push_back(fileJson);
+            }
+            fprintf(stderr, "out = %s\n", respArr.dump().c_str());
+            resp->String(respArr.dump());
+        });
+        mysqlTask->get_req()->set_query(sql);
+        series->push_back(mysqlTask);
+    });
     if(server.track().start(1234) == 0){
         server.list_routes();
         waitGroup.wait();
