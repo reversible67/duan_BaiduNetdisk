@@ -1,0 +1,5 @@
+syntax = "proto3";
+message ReqSignup{
+    string username = 1;
+    string password = 2;
+}
