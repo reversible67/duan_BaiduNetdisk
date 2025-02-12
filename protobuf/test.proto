@@ -1,0 +1,11 @@
+syntax = "proto3";
+// proto2的格式
+message ReqSignup{
+	// 消息中有两个字段
+	string username = 1;
+	// 字段的重复情况  required 必须出现一次  optional 可以出现0-1次 repeated 可以出现任意次 可以实现数组
+	// 字段的数据类型  string  int32
+	// 字段的名字
+	// 字段的编号 
+	string password = 2;
+}
