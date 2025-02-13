@@ -31,8 +31,14 @@ int main()
 	//signup_req.set_message("Hello, srpc!");
 	// 通过代理对象的方法，调用rpc
 	// 当服务端回复响应的时候，调用signup_done函数
-	client.Signup(&signup_req, signup_done);
+	// client.Signup(&signup_req, signup_done);
 
+	// 使用任务的形式来使用客户端
+	auto rpcTask = client.create_Signup_task(signup_done);
+	// 修改任务的属性 以设置rpc的参数
+	rpcTask->serialize_input(&signup_req);
+	// 启动任务
+	rpcTask->start();
 	wait_group.wait();
 	google::protobuf::ShutdownProtobufLibrary();
 	return 0;
