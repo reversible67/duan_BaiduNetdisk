@@ -466,3 +466,531 @@ SDK：性能稍微差一些，但是用起来简单一些
    ```shell
    g++ test.cpp -std=c++11 -fno-rtti -lalibabacloud-oss-cpp-sdk -lcurl -lcrypto -lpthread -o test.bin
    ```
+
+#### 单体应用的问题
+
+1.开发的角度：需要关心各个模块的耦合
+
+2.性能不够好
+
+3.运维，一崩全崩
+
+#### 微服务架构
+
+(每一个模块称为服务)
+
+用户                            文件
+
+​                数据库
+
+开发人员只需要考虑：1.服务的内部逻辑是什么样子的   2.对外的接口是什么样子的
+
+服务之间可以通过网络通信或者进程间通信类似的形式进行信息交互
+
+优势：低耦合 高内聚
+
+将函数调用替换为网络通信（请求和响应）
+
+### 把函数调用改造成网络通信
+
+`RESTful`风格`API`设计
+
+1.使用`Http`
+
+2.对象--------->资源----------->`url`
+
+3.成员函数/方法 ------------> 方法
+
+4.参数的返回值 ----------> 报文体 `Json/XML`
+
+问题：
+
+1.用的`http`协议
+
+2.使用起来复杂，复杂在请求，解析
+
+3.效率还是比较低（大量解析）
+
+诞生了一种专门的技术：A可以调用位于另一台机器的函数B --------> 远程过程调用 `RPC`
+
+`RPC`的优点：
+
+- 更小的协议开销。
+- 更高效的连接管理。
+- 更直接的数据传输方式。
+- 更多的性能优化空间。
+- 更低的实时性延迟。
+
+### 代理模式
+
+`RPC`框架实现
+
+Stub 存根
+
+A客户端                                                      B服务端
+
+Client                                                         Server
+
+​    ^
+
+​    |                                                                  ^
+
+​    |                                                                  |
+
+​    v                                                                  |
+
+​                                                                        v
+
+Client Stub（服务端代理）                 Server Stub
+
+​    ^
+
+​    |                                                                   ^
+
+​    |                                                                   |
+
+​    v                                                                    |
+
+​                                                                          v
+
+Socket ---------------------------------------- >   Socket
+
+### 序列化和反序列化
+
+​                       序列化
+
+对象        <------------------->   字节流
+
+​                       反序列化
+
+序列化          `Json.dump`
+
+反序列化       `Json.parse`
+
+`json`的问题：
+
+1.效率
+
+2.向前兼容，向后兼容
+
+### `protobuf`
+
+专用于`RPC`的序列化方案
+
+优势：
+
+1.二进制
+
+2.天生支持向前向后兼容
+
+3.跨语言
+
+4.特别适用于`RPC`    （自动实现代理模式）
+
+### 安装`protobuf`的流程
+
+1.安装`protobuf`
+
+```	c++
+1.sudo apt-get install autoconf automake libtool curl make g++ unzip
+2.wget https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protobuf-all-3.19.4.tar.gz
+3.cd protobuf-3.19.4
+4. ./autogen.sh   
+5. ./configure
+6.make
+7.make install
+8.protoc --version
+```
+
+#### 执行完上述后会装两个软件
+
+`1.libprotobuf.so`
+
+`2.protoc   编译器`  
+
+### 使用`protobuf`
+
+1.写`IDL`文件 （Interface Description Language） 接口描述语言
+
+注册请求  需要发送   `username`      	`password`
+
+消息整体叫`ReqSignup`        有两个字段  有且出现一次    除了`required `还有`optional`  `repeated`
+
+```protobuf
+// proto2的格式
+message ReqSignup{
+	// 消息中有两个字段
+	required string username = 1;
+	// 字段的重复情况  required 必须出现一次  optional 可以出现0-1次 repeated 可以出现任意次 可以实现数组
+	// 字段的数据类型  string  int32
+	// 字段的名字
+	// 字段的编号 
+	required string password = 2;
+}
+
+// proto3的格式 required需要省略
+syntax = "proto3";
+message ReqSignup{
+	string username = 1;
+	string password = 2;
+}
+```
+
+### 使用`protoc`把`IDL`文件转化成目标语言文件
+
+```bash
+protoc --proto_path=. --cpp_out=. test.proto
+# .h是接口文件 .cc是对应接口的实现文件
+```
+
+`ReqSignup` 对应的类名
+
+字段名字 对应的方法名 `username()  set_username()`
+
+#### 使用`test.pb.h`
+
+```C++
+#include <string>
+#include <stdio.h>
+#include "test.pb.h"
+int main(){
+    ReqSignup message;
+    std::string username = "admin";
+    std::string password = "1234";
+    message.set_username(username);
+    message.set_password(password);
+    // 这个内容通过网络发送到远处
+    // 序列化 包装成字节流 通过网络传输
+    // std::string output;
+    // message.SerializeToString(&output);
+    // printf("out = %s\n", output.c_str());
+    char arr[100] = {0};
+    message.SerializeToArray(arr, 100);
+    for(int i = 0; i < 100; ++i){
+        fprintf(stderr, "%02x", arr[i]);
+    }
+    // 反序列化为message
+    // message.ParseFromArray();
+}
+```
+
+#### 如何编译这个程序
+
+```bash
+g++ main.cc test.pb.cc -o main -lprotobuf
+./main
+```
+
+#### 怎么样支持向前向后兼容
+
+向前兼容：比如增加了字段  从2->3 （旧代码怎么处理新消息）
+
+1.新字段使用新编号
+
+2.旧代码遇到新编号，直接忽略字段
+
+3.删除字段要保留编号    
+
+4.给字段改名字没有影响  但是不能换类型
+
+向后兼容：新代码怎么处理就消息（比如这个包传递了很久才到）
+
+1.任何新加的字段 属性设置为optional
+
+### `srpc`
+
+### 使用`rpc`重写注册业务
+
+之前：
+
+Client    ----------------------------> Sever
+
+​               <----------------------------    ^
+
+​                                                        |
+
+​                                                        v
+
+​                                                    handler
+
+现在：
+
+Client ------------------------------>         边缘节点(`API`网关) 调用 注册服务并得到返回值  返回给Client
+
+```protobuf
+syntax = "proto3";
+service UserService{
+	// 用户注册
+	rpc Signup(ReqSignup) returns (RespSignup) {}
+}
+message ReqSignup{
+	string username = 1;
+	string password = 2;
+}
+
+message RespSignup{
+	int32 code = 1;
+	string message = 2;
+}
+```
+
+### 利用srpc生成代码
+
+安装srpc
+
+```bash
+git clone --recursive https://github.com/sogou/srpc.git
+cd srpc
+make
+sudo make install
+```
+
+首先使用`protoc`生成序列化相关代码
+
+```bash
+protoc signup.proto --cpp_out=. --proto_path=.
+# .pb.h  .pb.cc 消息的接口和实现
+```
+
+```bash
+srpc_generator protobuf signup.proto .
+# .sprc.h client_skeleton.cc server_skeleton.cc
+# .sprc.h    rpc的接口和设计
+# UserService是命名空间  需要继承Service类，重写Signup虚方法
+```
+
+```C++
+virtual void Signup(ReqSignup *request, RespSignup *response, srpc::RPCContext *ctx) = 0;
+// ReqSignup 是入参  
+// RespSignup 是返回值
+// srpc::RPCContext 和workflow对接
+```
+
+#### 客户端逻辑
+
+```C++
+#include "signup.srpc.h"
+#include "workflow/WFFacilities.h"
+
+using namespace srpc;
+
+static WFFacilities::WaitGroup wait_group(1);
+
+void sig_handler(int signo)
+{
+	wait_group.done();
+}
+
+static void signup_done(RespSignup *response, srpc::RPCContext *context)
+{
+}
+
+int main()
+{
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+    // signup服务器所在的ip:port
+	const char *ip = "127.0.0.1";
+	unsigned short port = 1412;
+	
+    // 相当于stub  服务端在客户端的代理
+	UserService::SRPCClient client(ip, port);
+
+	// example for RPC method call
+	ReqSignup signup_req;
+	//signup_req.set_message("Hello, srpc!");
+    // 使用rpc的形式和普通的函数调用一样  但是底层是跨越网络的调用
+    // signup_done是回调函数
+	client.Signup(&signup_req, signup_done);
+
+	wait_group.wait();
+	google::protobuf::ShutdownProtobufLibrary();
+	return 0;
+}
+```
+
+#### 服务端逻辑
+
+```C++
+#include "signup.srpc.h"
+#include "workflow/WFFacilities.h"
+
+using namespace srpc;
+
+static WFFacilities::WaitGroup wait_group(1);
+
+void sig_handler(int signo)
+{
+	wait_group.done();
+}
+
+class UserServiceServiceImpl : public UserService::Service
+{
+public:
+
+	void Signup(ReqSignup *request, RespSignup *response, srpc::RPCContext *ctx) override
+	{
+		// TODO: fill server logic here
+	}
+};
+
+int main()
+{
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+	unsigned short port = 1412;
+	SRPCServer server;
+
+    // 注册一个服务
+	UserServiceServiceImpl userservice_impl;
+	server.add_service(&userservice_impl);
+
+	server.start(port);
+	wait_group.wait();
+	server.stop();
+	google::protobuf::ShutdownProtobufLibrary();
+	return 0;
+}
+```
+
+### 使用`srpc`改造注册的过程
+
+补充`client.pb_skeleton.cc` 和 `server.pb_skeleton.cc`
+
+### 网盘项目的微服务化改造
+
+`C`------------------------> `API`网关 --------------------------> ..........
+
+通过`rpc`进行调用
+
+微服务的好处：
+
+1.开发和治理分离
+
+2.高内聚，低耦合
+
+3.独立部署，独立升级
+
+4.容错性很好
+
+5.实现异构系统 (`rpc`支持跨语言，有些业务用`C++`写，有些业务用`java`写，有些业务用`php`写)
+
+### 注册中心
+
+本质上是一个键值对数据库！ 拉起服务的时候做一次写入（`SET`）的操作，访问服务的时候做一次读（`GET`）操作
+
+注册中心是一个大流量的地方，如果业务越来越复杂，注册中心就会成为一个性能瓶颈（可以通过加机器来解决问题）
+
+解决方案：改为数据库集群
+
+本项目的注册中心没有从头开始实现，使用的是现有的
+
+### `consul`
+
+使用`go`语言开发的，基于`raft`共识算法
+
+`Consul`是一个用于服务发现、健康检查和动态配置的工具，使得分布式系统中的服务能够轻松地相互发现和通信。`ppconsul`是一个用于C++的库，为开发者提供了与Consul进行交互的简单而强大的接口
+
+其它产品：
+
+`Java`     `Zookeeper`  基于`Zab`共识算法
+
+`Go`   `Etcd`    基于`raft`共识算法
+
+`C++`  `braft`    基于`raft`共识算法
+
+三个节点的集群
+
+```bash
+# consul1 是集群主节点
+docker run --name consul1 -d -p 8500:8500 -p 8301:8301 -p 8302:8302 consul agent -server -bootstrap-exepect 2 -ui bind=0.0.0.0 -client=0.0.0.0
+# 主节点绑定的网卡
+docker inspect --format '{{.NetworkSeetings.IPAddress}}' consul1
+# 启动第二个节点
+docker run --name consul2 -d -p 8501:8500 consul agent -server -bind=0.0.0.0 -client=0.0.0.0 -join=172.17.0.7
+# 启动第三个节点
+docker run --name consul2 -d -p 8502:8500 consul agent -server -bind=0.0.0.0 -client=0.0.0.0 -join=172.17.0.7
+```
+
+使用三个节点：共识！！！
+
+### consul支持的操作
+
+用户把consul集群看成单独的节点
+
+1.注册  2.心跳（告诉它我还活着）3.获取服务的`ip`和`port`
+
+`consul` 支持 `Restful API`
+
+也可以使用第三方库/`SDK`     因为我们更喜欢函数调用的方式
+
+安装`ppconsul`
+
+涉及的头文件
+
+```C++
+#include<ppconsul/agent.h>
+// 链接选项 -lppconsul
+```
+
+### 项目细节
+
+在服务端`server.pb_skeleton.cc`中
+
+1.将本服务注册到consul之中
+
+2.创建一个用来访问注册中心的agent
+
+3.开启一个服务
+
+在`main.cc`中 将所用的发给服务端的请求，都改为发送给`API`网关
+
+1.首先通过`httpTask`访问`consul`
+
+2.解析`consul`的响应内容   转为`Json`
+
+3.发起`RPC`调用
+
+#### 不再是单体应用
+
+```C++
+// 2 得到SignupService的IP:PORT
+std::string url = "http://1.94.50.145:8500/v1/agent/services";
+auto httpTask = WFTaskFactory::create_http_task(url, 0, 0, [username, password, resp](WFHttpTask *httpTask){
+    // 解析consul的响应内容
+    auto consulResp = httpTask->get_resp();
+    const void *body;
+    size_t size;
+    consulResp->get_parsed_body(&body, &size);
+    Json services = Json::parse(static_cast<const char *>(body));
+    std::string ip = services["SignupService1"]["Address"];
+    unsigned short port = services["SignupService1"]["Port"];
+    // 3 发起RPC调用
+    // 创建一个代理对象
+    UserService::SRPCClient client(ip.c_str(), port);
+    // 创建一个请求
+    ReqSignup reqSignup;
+    reqSignup.set_username(username);
+    reqSignup.set_password(password);
+    // 通过代理对象的方法，调用rpc
+    // 使用任务的形式来使用客户端
+    auto rpcTask = client.create_Signup_task([resp](RespSignup *response, srpc::RPCContext *ctx){
+        if(ctx->success() && response->code() == 0){
+            resp->String("SUCCESS");
+        }
+        else{
+            fprintf(stderr, "status = %d, error = &d, errmsg = %s\n",
+                 ctx->get_status_code(), ctx->get_error(), ctx->get_errmsg());
+            resp->String("FAIL");
+        }
+    });
+    // 修改任务的属性以设置rpc传入参数
+    rpcTask->serialize_input(&reqSignup);
+    // 启动任务
+    series_of(httpTask)->push_back(rpcTask);
+});
+// 这个httpTask去访问consul
+series->push_back(httpTask);
+```
+
+如果要将网盘彻底改为微服务，把原来一次性做完的东西（查数据库，各种任务）放到微服务进行处理
+
+`main.cc`中的`API网关`只负责接收客户端的请求，发起`RPC`的调用
