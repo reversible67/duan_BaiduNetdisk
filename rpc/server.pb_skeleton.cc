@@ -1,6 +1,7 @@
 #include "signup.srpc.h"
 #include "workflow/WFFacilities.h"
 #include "linuxheader.h"
+#include <ppconsul/agent.h>
 
 using namespace srpc;
 
@@ -41,6 +42,15 @@ public:
 	}
 };
 
+void timerCallback(WFTimerTask *timerTask){
+	fprintf(stderr, "time = %ld\n", time(NULL));
+	ppconsul::agent::Agent *pagent = static_cast<ppconsul::agent::Agent *>(timerTask->user_data);
+	pagent->servicePass("SignupService1");
+	auto nextTask = WFTaskFactory::create_timer_task(5000000, timerCallback);
+	nextTask->user_data = pagent;
+	series_of(timerTask)->push_back(nextTask);
+}
+
 int main()
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -51,6 +61,29 @@ int main()
 	server.add_service(&userservice_impl);
 
 	server.start(port);
+
+	// 将本服务注册到consul之中
+	// 找到dc1注册中心  consul是客户端对象
+	ppconsul::Consul consul("127.0.0.1:8500", ppconsul::kw::dc = "dc1");
+	// 创建一个用来访问注册中心的agent
+	ppconsul::agent::Agent agent(consul);
+	// 开启一个服务
+	agent.registerService(
+		ppconsul::agent::kw::name = "SignupService1",
+		ppconsul::agent::kw::address = "127.0.0.1",
+		ppconsul::agent::kw::id = "SignupService1",
+		ppconsul::agent::kw::port = 1234,
+		ppconsul::agent::kw::check = ppconsul::agent::TtlCheck{std::chrono::seconds(10)}
+	);
+	// 把自己活着的消息告诉consul
+	// 只要活着 就要永久的执行下去
+	// agent.servicePass("SignupService1");
+	// 创建一个定时任务 每隔一段时间pass一次
+	auto timerTask = WFTaskFactory::create_timer_task(5000000, timerCallback);
+	timerTask->user_data = &agent;
+	timerTask->start();
+	// 取消服务
+	// agent.deregisterService("SignupService1");
 	wait_group.wait();
 	server.stop();
 	google::protobuf::ShutdownProtobufLibrary();
