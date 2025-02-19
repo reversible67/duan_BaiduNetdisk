@@ -20,39 +20,39 @@ void sigHandler(int num){
 int main(){
     signal(SIGINT, sigHandler);
     wfrest::HttpServer server;
-    // ÏÔÊ¾ÉÏ´«½çÃæ
+    // æ˜¾ç¤ºä¸Šä¼ ç•Œé¢
     server.GET("/file/upload", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         resp->File("./static/view/index.html");
     });
-    // ÉÏ´«ÎÄ¼ş
+    // ä¸Šä¼ æ–‡ä»¶
     server.POST("/file/upload",[](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
-        // ´ÓURLÖĞÌáÈ¡ÓÃ»§ÃûµÄĞÅÏ¢
+        // ä»URLä¸­æå–ç”¨æˆ·åçš„ä¿¡æ¯
         auto userInfo = req->query_list();
         std::string username = userInfo["username"];
-        // ¶ÁÈ¡ÎÄ¼şÄÚÈİ ½âÎöform-dataÀàĞÍµÄÇëÇó±¨ÎÄ
+        // è¯»å–æ–‡ä»¶å†…å®¹ è§£æform-dataç±»å‹çš„è¯·æ±‚æŠ¥æ–‡
         using Form = std::map<std::string, std::pair<std::string, std::string>>;
         Form &form = req->form();
         auto fileInfo = form["file"];
-        // fileInfo.first = ÎÄ¼şÃû  fileInfo.second = ÎÄ¼şÄÚÈİ
-        // tmpÄ¿Â¼´æ·ÅËùÓĞÎÄ¼ş  ÒÔ¼°ÓÃÓÚÉú³ÉÎÄ¼şÂ·¾¶
+        // fileInfo.first = æ–‡ä»¶å  fileInfo.second = æ–‡ä»¶å†…å®¹
+        // tmpç›®å½•å­˜æ”¾æ‰€æœ‰æ–‡ä»¶  ä»¥åŠç”¨äºç”Ÿæˆæ–‡ä»¶è·¯å¾„
         std::string filepath = "./tmp/" + fileInfo.first;
-        // Í¨¹ıopenÏµÍ³µ÷ÓÃ½øĞĞ´´½¨ÎÄ¼ş
-        // ¼ÓÉÏO_EXCL ÉÏ´«ÖØ¸´ÎÄ¼ş»á±¨´í
+        // é€šè¿‡openç³»ç»Ÿè°ƒç”¨è¿›è¡Œåˆ›å»ºæ–‡ä»¶
+        // åŠ ä¸ŠO_EXCL ä¸Šä¼ é‡å¤æ–‡ä»¶ä¼šæŠ¥é”™
         int fd = open(filepath.c_str(), O_RDWR | O_CREAT | O_EXCL, 0666);
         if(fd < 0){
-            // ±¨´í
+            // æŠ¥é”™
             resp->set_status_code("500");
         }
-        // »¹¿ÉÒÔ²ÉÓÃÒì³£»úÖÆ
+        // è¿˜å¯ä»¥é‡‡ç”¨å¼‚å¸¸æœºåˆ¶
         // try {} catch ()
-        // ½«¶Áµ½µÄËùÓĞÄÚÈİ Ğ´½øÈ¥
-        // ·½°¸1 Í¨¹ıwriteÏµÍ³µ÷ÓÃ µ«ÊÇÊÇÍ¬²½µÄ Ğ§ÂÊ½ÏµÍ
+        // å°†è¯»åˆ°çš„æ‰€æœ‰å†…å®¹ å†™è¿›å»
+        // æ–¹æ¡ˆ1 é€šè¿‡writeç³»ç»Ÿè°ƒç”¨ ä½†æ˜¯æ˜¯åŒæ­¥çš„ æ•ˆç‡è¾ƒä½
         int ret = write(fd, fileInfo.second.c_str(), fileInfo.second.size());
         close(fd);
-        // ·½°¸2 pwriteµÄÈÎÎñ Òì²½¿ò¼Ü
+        // æ–¹æ¡ˆ2 pwriteçš„ä»»åŠ¡ å¼‚æ­¥æ¡†æ¶
         // auto pwriteTask = WFTaskFactory::create_pwrite_task(fd, fileInfo.second.c_str(), fileInfo.second.size(), 0, callback);
         // series->push_back(pwriteTask);
-        // °ÑÉÏ´«ÎÄ¼şÖ®ºóµÄÂß¼­Ğ´µ½callbackµ±ÖĞ
+        // æŠŠä¸Šä¼ æ–‡ä»¶ä¹‹åçš„é€»è¾‘å†™åˆ°callbackå½“ä¸­
 
         // for(auto it : form){
         //     fprintf(stderr, "it.first = %s, it.second.first = %s, it.second.second = %s\n", it.first.c_str(),
@@ -77,43 +77,43 @@ int main(){
         // resp->MySQL("mysql://root:123456@localhost", sql, [](Json *pjson){
         //     fprintf(stderr, "out = %s\n", pjson->dump().c_str());
         // });
-        // Èç¹ûÉÏ´«³É¹¦À²  ÉèÖÃ302£¨ÖØ¶¨Ïò£©
+        // å¦‚æœä¸Šä¼ æˆåŠŸå•¦  è®¾ç½®302ï¼ˆé‡å®šå‘ï¼‰
         resp->set_status_code("302");
-        // °ÑlocationËù¶ÔÓ¦µÄ¼üÖµ¸ÄÎª /file/upload/success
+        // æŠŠlocationæ‰€å¯¹åº”çš„é”®å€¼æ”¹ä¸º /file/upload/success
         resp->headers["Location"] = "/file/upload/success";
     });
     server.GET("/file/upload/success", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         resp->String("Upload success");
     });
-    // ÊµÏÖÎÄ¼şÏÂÔØ¹¦ÄÜ
+    // å®ç°æ–‡ä»¶ä¸‹è½½åŠŸèƒ½
     server.GET("/file/download", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         // /file/download?filehash=aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d&filename=1.txt&filesize=5
-        // ½âÎöÓÃ»§ÇëÇó²Ù×÷
+        // è§£æç”¨æˆ·è¯·æ±‚æ“ä½œ
         auto fileInfo = req->query_list();
         std::string filesha1 = fileInfo["filehash"];
         std::string filename = fileInfo["filename"];
         int filesize = std::stoi(fileInfo["filesize"]);
-        // ´ò¿ªÎÄ¼ş
+        // æ‰“å¼€æ–‡ä»¶
         std::string filepath = "tmp/" + filename;
         int fd = open(filepath.c_str(), O_RDONLY);
-        // ÉêÇëÒ»Æ¬ÄÚ´æ °ÑÎÄ¼şÄÚÈİ·Å½øÈ¥ ÒÆµ½ÏìÓ¦±¨ÎÄµÄ±¨ÎÄÌåÖĞ
-        // ÓĞ¿ÉÄÜÄÚÈİºÜ´ó ËùÒÔÔÚ¶ÑÉÏÉêÇë
-        // »ñÈ¡ÎÄ¼ş´óĞ¡ lseek ÒÆ¶¯µ½ÎÄ¼şÄ©Î²µÄ¾àÀë
+        // ç”³è¯·ä¸€ç‰‡å†…å­˜ æŠŠæ–‡ä»¶å†…å®¹æ”¾è¿›å» ç§»åˆ°å“åº”æŠ¥æ–‡çš„æŠ¥æ–‡ä½“ä¸­
+        // æœ‰å¯èƒ½å†…å®¹å¾ˆå¤§ æ‰€ä»¥åœ¨å †ä¸Šç”³è¯·
+        // è·å–æ–‡ä»¶å¤§å° lseek ç§»åŠ¨åˆ°æ–‡ä»¶æœ«å°¾çš„è·ç¦»
         int size = lseek(fd, 0, SEEK_END);
-        // ÓÃÍêÖ®ºóÔÙÆ«ÒÆ»ØÈ¥
+        // ç”¨å®Œä¹‹åå†åç§»å›å»
         lseek(fd, 0, SEEK_SET);
         std::unique_ptr<char []> buf(new char[size]);
-        // ¶Á½øÀ´ Ò»´ÎĞÔ½«ÎÄ¼şÄÚÈİÈ«²¿¶ÁÈ¡½øÀ´
+        // è¯»è¿›æ¥ ä¸€æ¬¡æ€§å°†æ–‡ä»¶å†…å®¹å…¨éƒ¨è¯»å–è¿›æ¥
         read(fd, buf.get(), size);
-        // ÉèÖÃÏìÓ¦Ìå ·¢ËÍ»Ø¿Í»§¶Ë
+        // è®¾ç½®å“åº”ä½“ å‘é€å›å®¢æˆ·ç«¯
         resp->append_output_body(buf.get(), size);
-        // Ä¬ÈÏÏÂÔØ
+        // é»˜è®¤ä¸‹è½½
         resp->headers["Content-Type"] = "application/octect-stream";
-        // Ö¸¶¨Ä¬ÈÏÏÂÔØµÄÎÄ¼şÃû
+        // æŒ‡å®šé»˜è®¤ä¸‹è½½çš„æ–‡ä»¶å
         resp->headers["content-disposition"] = "attachment;filename="+filename;
     });
     
-   // Ê¹ÓÃnginx·şÎñÆ÷
+   // ä½¿ç”¨nginxæœåŠ¡å™¨
     /*server.GET("/file/download", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         auto fileInfo = req->query_list();
         std::string filesha1 = fileInfo["filehash"];
@@ -122,48 +122,87 @@ int main(){
         resp->set_status_code("302");
         resp->headers["Location"] = "http://1.94.50.145:1235/" + filename;
     });*/
-    // ÒıÈëÊı¾İ¿â Êı¾İ¿âĞèÒªÄÄĞ©±íÄØ£¿
-    // 1.È«¾ÖÎÄ¼ş±í   °ÑËùÓĞµÄÎÄ¼şĞÅÏ¢¼ÇÂ¼ÏÂÀ´  ÎÄ¼şÃû ÎÄ¼ş¹şÏ£Öµ ÎÄ¼ş´óĞ¡ ÎÄ¼şÎ»ÖÃ... tbl_file
+    // å¼•å…¥æ•°æ®åº“ æ•°æ®åº“éœ€è¦å“ªäº›è¡¨å‘¢ï¼Ÿ
+    // 1.å…¨å±€æ–‡ä»¶è¡¨   æŠŠæ‰€æœ‰çš„æ–‡ä»¶ä¿¡æ¯è®°å½•ä¸‹æ¥  æ–‡ä»¶å æ–‡ä»¶å“ˆå¸Œå€¼ æ–‡ä»¶å¤§å° æ–‡ä»¶ä½ç½®... tbl_file
     /*
-    ·Ö¿â·Ö±íºÍÖ÷´Ó¸´ÖÆÓ¦ÓÃ³¡¾°
-    ·Ö¿â·Ö±íÊÇÎªÁËÓ¦¶ÔÊı¾İÁ¿¹ı´óµÄÌôÕ½
-    Ö÷´Ó¸´ÖÆÊÇÎªÁËÌá¸ß¶ÁĞÔÄÜ£¬Ìá¹©Èİ´í¹¦ÄÜ£¬Ìá¸ß¿ÉÓÃĞÔ
+    åˆ†åº“åˆ†è¡¨å’Œä¸»ä»å¤åˆ¶åº”ç”¨åœºæ™¯
+    åˆ†åº“åˆ†è¡¨æ˜¯ä¸ºäº†åº”å¯¹æ•°æ®é‡è¿‡å¤§çš„æŒ‘æˆ˜
+    ä¸»ä»å¤åˆ¶æ˜¯ä¸ºäº†æé«˜è¯»æ€§èƒ½ï¼Œæä¾›å®¹é”™åŠŸèƒ½ï¼Œæé«˜å¯ç”¨æ€§
     */
-    // ¿ÉÒÔ°Ñ±í´¹Ö±·ÖÁÑ ³£ÓÃµÄĞÅÏ¢·ÅÔÚtb1 ²»³£ÓÃµÄ·ÅÔÚtb2
+    // å¯ä»¥æŠŠè¡¨å‚ç›´åˆ†è£‚ å¸¸ç”¨çš„ä¿¡æ¯æ”¾åœ¨tb1 ä¸å¸¸ç”¨çš„æ”¾åœ¨tb2
     /*
-    ´¹Ö±·ÖÆ¬µÄÓÅµã£º
-    1.Ìá¸ß²éÑ¯ĞÔÄÜ£ºÖ»²éÑ¯ËùĞèµÄ×Ö¶Î£¬¼õÉÙÁËÊı¾İµÄ¶ÁÈ¡ºÍ´«ÊäÁ¿£¬Ìá¸ßÁË²éÑ¯Ğ§ÂÊ¡£ 
-    2.¼õÉÙÈßÓàÊı¾İ£ºÃ¿¸öÊı¾İ¿â»ò±íÖ»°üº¬Ïà¹ØµÄÊı¾İ£¬±ÜÃâÁË´æ´¢ÈßÓà×Ö¶ÎµÄ¿ªÏú¡£ 3.
-    ½µµÍÊı¾İ¿â¸ºÔØ£º½«²»Í¬ÒµÎñ¹ØÁªĞÔ²»Ç¿µÄ±í·ÖÉ¢µ½²»Í¬µÄÊı¾İ¿âÖĞ£¬¿ÉÒÔ½µµÍµ¥Ò»Êı¾İ¿âµÄ¸ºÔØÑ¹Á¦£¬Ìá¸ßÊı¾İ¿âµÄ²¢·¢´¦ÀíÄÜÁ¦¡£
-    ´¹Ö±·ÖÆ¬µÄÈ±µã£º
-    1.²¿·ÖÊ±ºò²éÑ¯Ğ§ÂÊµÍ ĞèÒªjoin
+    å‚ç›´åˆ†ç‰‡çš„ä¼˜ç‚¹ï¼š
+    1.æé«˜æŸ¥è¯¢æ€§èƒ½ï¼šåªæŸ¥è¯¢æ‰€éœ€çš„å­—æ®µï¼Œå‡å°‘äº†æ•°æ®çš„è¯»å–å’Œä¼ è¾“é‡ï¼Œæé«˜äº†æŸ¥è¯¢æ•ˆç‡ã€‚ 
+    2.å‡å°‘å†—ä½™æ•°æ®ï¼šæ¯ä¸ªæ•°æ®åº“æˆ–è¡¨åªåŒ…å«ç›¸å…³çš„æ•°æ®ï¼Œé¿å…äº†å­˜å‚¨å†—ä½™å­—æ®µçš„å¼€é”€ã€‚ 3.
+    é™ä½æ•°æ®åº“è´Ÿè½½ï¼šå°†ä¸åŒä¸šåŠ¡å…³è”æ€§ä¸å¼ºçš„è¡¨åˆ†æ•£åˆ°ä¸åŒçš„æ•°æ®åº“ä¸­ï¼Œå¯ä»¥é™ä½å•ä¸€æ•°æ®åº“çš„è´Ÿè½½å‹åŠ›ï¼Œæé«˜æ•°æ®åº“çš„å¹¶å‘å¤„ç†èƒ½åŠ›ã€‚
+    å‚ç›´åˆ†ç‰‡çš„ç¼ºç‚¹ï¼š
+    1.éƒ¨åˆ†æ—¶å€™æŸ¥è¯¢æ•ˆç‡ä½ éœ€è¦join
     */
     /*
-    Ë®Æ½·ÖÆ¬£ºÁ½¸ö±í½á¹¹ÊÇÒ»ÑùµÄ  Èô¸ÉĞĞÊôÓÚtb1  Èô¸ÉĞĞÊôÓÚtb2
-    ¿ÉÒÔ½â¾öÊı¾İÁ¿¹ı´óµÄÎÊÌâ
+    æ°´å¹³åˆ†ç‰‡ï¼šä¸¤ä¸ªè¡¨ç»“æ„æ˜¯ä¸€æ ·çš„  è‹¥å¹²è¡Œå±äºtb1  è‹¥å¹²è¡Œå±äºtb2
+    å¯ä»¥è§£å†³æ•°æ®é‡è¿‡å¤§çš„é—®é¢˜
     */
-    // 2.ÓÃ»§±í  tbl_user
-    // 3.ÓÃ»§ÎÄ¼ş±í  tbl_user_file
-    // 4.token±í   Ã¿Ò»´ÎµÇÂ¼ÒÔºó  ¸ø¿Í»§¶ËÒ»¸öÆ¾Ö¤  ÓÃÓÚ·şÎñ¶ËĞ£ÕıÄãÓĞÃ»ÓĞÕâ¸ö×Ê¸ñ  tokenÓĞĞ§Ê±¼ä£º1¸öĞÇÆÚ-1¸öÔÂ ×îºÃ·ÅÈëredis EXPIREÖ¸Áî
-    // ×¢²á½çÃæ
+    // 2.ç”¨æˆ·è¡¨  tbl_user
+    // 3.ç”¨æˆ·æ–‡ä»¶è¡¨  tbl_user_file
+    // 4.tokenè¡¨   æ¯ä¸€æ¬¡ç™»å½•ä»¥å  ç»™å®¢æˆ·ç«¯ä¸€ä¸ªå‡­è¯  ç”¨äºæœåŠ¡ç«¯æ ¡æ­£ä½ æœ‰æ²¡æœ‰è¿™ä¸ªèµ„æ ¼  tokenæœ‰æ•ˆæ—¶é—´ï¼š1ä¸ªæ˜ŸæœŸ-1ä¸ªæœˆ æœ€å¥½æ”¾å…¥redis EXPIREæŒ‡ä»¤
+    // æ³¨å†Œç•Œé¢
     server.GET("/user/signup", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         resp->File("static/view/signup.html");
     });
     server.POST("/user/signup", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
-        // 1.°´urlencodedµÄĞÎÊ½È¥½âÎöpost±¨ÎÄÌå
+        // 1.æŒ‰urlencodedçš„å½¢å¼å»è§£æpostæŠ¥æ–‡ä½“
         std::map<std::string, std::string> &form_kv = req->form_kv();
         std::string username = form_kv["username"];
         std::string password = form_kv["password"];
-        // 2.°ÑÃÜÂë½øĞĞ¼ÓÃÜ
+
+        // 2 å¾—åˆ°SignupServiceçš„IP:PORT
+        std::string url = "http://1.94.50.145:8500/v1/agent/services";
+        auto httpTask = WFTaskFactory::create_http_task(url, 0, 0, [username, password, resp](WFHttpTask *httpTask){
+            // è§£æconsulçš„å“åº”å†…å®¹
+            auto consulResp = httpTask->get_resp();
+            const void *body;
+            size_t size;
+            consulResp->get_parsed_body(&body, &size);
+            Json services = Json::parse(static_cast<const char *>(body));
+            std::string ip = services["SignupService1"]["Address"];
+            unsigned short port = services["SignupService1"]["Port"];
+            // 3 å‘èµ·RPCè°ƒç”¨
+            // åˆ›å»ºä¸€ä¸ªä»£ç†å¯¹è±¡
+            UserService::SRPCClient client(ip.c_str(), port);
+            // åˆ›å»ºä¸€ä¸ªè¯·æ±‚
+            ReqSignup reqSignup;
+            reqSignup.set_username(username);
+            reqSignup.set_password(password);
+            // é€šè¿‡ä»£ç†å¯¹è±¡çš„æ–¹æ³•ï¼Œè°ƒç”¨rpc
+            // ä½¿ç”¨ä»»åŠ¡çš„å½¢å¼æ¥ä½¿ç”¨å®¢æˆ·ç«¯
+            auto rpcTask = client.create_Signup_task([resp](RespSignup *response, srpc::RPCContext *ctx){
+                if(ctx->success() && response->code() == 0){
+                    resp->String("SUCCESS");
+                }
+                else{
+                    fprintf(stderr, "status = %d, error = &d, errmsg = %s\n",
+                    ctx->get_status_code(), ctx->get_error(), ctx->get_errmsg());
+                    resp->String("FAIL");
+                }
+            });
+            // ä¿®æ”¹ä»»åŠ¡çš„å±æ€§ä»¥è®¾ç½®rpcä¼ å…¥å‚æ•°
+            rpcTask->serialize_input(&reqSignup);
+            // å¯åŠ¨ä»»åŠ¡
+            series_of(httpTask)->push_back(rpcTask);
+        });
+        // è¿™ä¸ªhttpTaskå»è®¿é—®consul
+        series->push_back(httpTask);
+        
+        /* // 2.æŠŠå¯†ç è¿›è¡ŒåŠ å¯†
         std::string salt = "12345678";
         char *encryptPassword = crypt(password.c_str(), salt.c_str());
         fprintf(stderr, "encryptPassword = %s\n", encryptPassword);
-        // 3.°ÑÓÃ»§ĞÅÏ¢²åÈëµ½Êı¾İ¿â
+        // 3.æŠŠç”¨æˆ·ä¿¡æ¯æ’å…¥åˆ°æ•°æ®åº“
         std::string sql = "INSERT INTO cloudisk.tbl_user (user_name, user_pwd) VALUES ('"+ username + "', '" + encryptPassword + "');";
         fprintf(stderr, "sql = %s\n", sql.c_str());
         // create_mysql_task
         auto mysqlTask = WFTaskFactory::create_mysql_task("mysql://root:123456@localhost", 0, [](WFMySQLTask *mysqlTask){
-            // 4.»Ø¸´Ò»¸öSUCCESS¸øÇ°¶Ë
+            // 4.å›å¤ä¸€ä¸ªSUCCESSç»™å‰ç«¯
             wfrest::HttpResp *resp2client = static_cast<wfrest::HttpResp *>(mysqlTask->user_data);
             if(mysqlTask->get_state() != WFT_STATE_SUCCESS){
                 fprintf(stderr, "error msg:%s\n", WFGlobal::get_error_string(mysqlTask->get_state(), mysqlTask->get_error()));
@@ -171,11 +210,11 @@ int main(){
                 resp2client->append_output_body("FAIL", 4);
                 return;
             }
-            // ²é¿´Ö¸ÁîÊÇ·ñÖ´ĞĞ³É¹¦  ÄÃµ½ÏìÓ¦
+            // æŸ¥çœ‹æŒ‡ä»¤æ˜¯å¦æ‰§è¡ŒæˆåŠŸ  æ‹¿åˆ°å“åº”
             protocol::MySQLResponse *resp = mysqlTask->get_resp();
             protocol::MySQLResultCursor cursor(resp);
-            // »ñÈ¡±¨´íÀàĞÍ
-            // ¼ì²éÓï·¨´íÎó
+            // è·å–æŠ¥é”™ç±»å‹
+            // æ£€æŸ¥è¯­æ³•é”™è¯¯
             if(resp->get_packet_type() == MYSQL_PACKET_ERROR){
                 fprintf(stderr, "error_code = %d msg = %s\n", resp->get_error_code(), resp->get_error_msg().c_str());
                 resp2client->append_output_body("FAIL", 4);
@@ -183,7 +222,7 @@ int main(){
             }
 
             if(cursor.get_cursor_status() == MYSQL_STATUS_OK){
-                // Ğ´Ö¸Áî£¬Ö´ĞĞ³É¹¦
+                // å†™æŒ‡ä»¤ï¼Œæ‰§è¡ŒæˆåŠŸ
                 fprintf(stderr, "OK. %llu rows affected. %d warnings. insert_id = %llu.\n", cursor.get_affected_rows(), cursor.get_warnings(), cursor.get_insert_id());
                 if(cursor.get_affected_rows() == 1){
                     resp2client->append_output_body("SUCCESS", 7);
@@ -194,7 +233,7 @@ int main(){
         mysqlTask->get_req()->set_query(sql);
         mysqlTask->user_data = resp;
         // push_back
-        series->push_back(mysqlTask);
+        series->push_back(mysqlTask); */
     });
     server.GET("/static/view/signin.html", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp){
         resp->File("static/view/signin.html");
@@ -209,49 +248,49 @@ int main(){
         resp->File("static/img/avatar.jepg");
     });
     server.POST("/user/signin", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
-        // 1.½âÎöÓÃ»§ÇëÇó
+        // 1.è§£æç”¨æˆ·è¯·æ±‚
         std::map<std::string, std::string> &form_kv = req->form_kv();
         std::string username = form_kv["username"];
         std::string password = form_kv["password"];
-        // 2.²éÑ¯Êı¾İ¿â
+        // 2.æŸ¥è¯¢æ•°æ®åº“
         std::string url = "mysql://root:123456@localhost";
         std::string sql = "SELECT user_pwd FROM cloudisk.tbl_user WHERE user_name = '" + username + "' LIMIT 1;";
         auto readTask = WFTaskFactory::create_mysql_task(url, 0, [](WFMySQLTask *readTask){
-            // ÌáÈ¡readTaskµÄ½á¹û
+            // æå–readTaskçš„ç»“æœ
             auto resp = readTask->get_resp();
-            // ×÷Îªµü´úÆ÷ »ñÈ¡½á¹û
+            // ä½œä¸ºè¿­ä»£å™¨ è·å–ç»“æœ
             protocol::MySQLResultCursor cursor(resp);
 
             std::vector<std::vector<protocol::MySQLCell>> rows;
             cursor.fetch_all(rows);
 
-            // Êı¾İ¿âÖĞµÄÃÜÂë
+            // æ•°æ®åº“ä¸­çš„å¯†ç 
             std::string nowPassword = rows[0][0].as_string();
             fprintf(stderr, "nowPassword = %s\n", nowPassword.c_str());
 
             UserInfo *userinfo = static_cast<UserInfo *>(series_of(readTask)->get_context());
-            // ÓÃ»§ÊäÈëµÄÃÜÂë
+            // ç”¨æˆ·è¾“å…¥çš„å¯†ç 
             char * inPassword = crypt(userinfo->password.c_str(), "12345678");
             fprintf(stderr, "inPassword = %s\n", inPassword);
             if(strcmp(nowPassword.c_str(), inPassword) != 0){
                 userinfo->resp->append_output_body("FAIL", 4);
                 return;
             }
-            // 3.Éú³ÉÒ»¸ötoken£¬´æÈëÊı¾İ¿âÖĞ
-            // ¸ù¾İÓÃ»§µÄĞÅÏ¢ ¾­¹ı¼ÓÃÜµÃµ½ÃÜÎÄ  Æ´½ÓÉÏµÇÂ½Ê±¼ä ºÏÔÚÒ»Æğ¾ÍÊÇtoken
-            // ÑÎÖµ¹Ì¶¨ Îª12345678
+            // 3.ç”Ÿæˆä¸€ä¸ªtokenï¼Œå­˜å…¥æ•°æ®åº“ä¸­
+            // æ ¹æ®ç”¨æˆ·çš„ä¿¡æ¯ ç»è¿‡åŠ å¯†å¾—åˆ°å¯†æ–‡  æ‹¼æ¥ä¸Šç™»é™†æ—¶é—´ åˆåœ¨ä¸€èµ·å°±æ˜¯token
+            // ç›å€¼å›ºå®š ä¸º12345678
             Token usertoken(userinfo->username, "12345678");
             fprintf(stderr, "token = %s\n", usertoken.token.c_str());
             userinfo->token = usertoken.token;
-            // ´æÈëÊı¾İ¿âµ±ÖĞ
+            // å­˜å…¥æ•°æ®åº“å½“ä¸­
             std::string url = "mysql://root:123456@localhost";
-            // replace Ïàµ±ÓÚ insert ºÍ updateµÄ½áºÏ
+            // replace ç›¸å½“äº insert å’Œ updateçš„ç»“åˆ
             std::string sql = "REPLACE INTO cloudisk.tbl_user_token (user_name, user_token) VALUES ('" 
                 + userinfo->username + "', '" 
                 + usertoken.token + "');";
             auto writeTask = WFTaskFactory::create_mysql_task(url, 0, [readTask](WFMySQLTask *writeTask){
-                // ÕâÀïÃ»ÓĞ×ö¼ì²é  ¼ÙÉè³É¹¦
-                // // 4.½«ĞÅÏ¢°ü×°³ÉJson ·µ»Ø¸ø¿Í»§¶Ë
+                // è¿™é‡Œæ²¡æœ‰åšæ£€æŸ¥  å‡è®¾æˆåŠŸ
+                // // 4.å°†ä¿¡æ¯åŒ…è£…æˆJson è¿”å›ç»™å®¢æˆ·ç«¯
                 UserInfo *userinfo = static_cast<UserInfo *>(series_of(readTask)->get_context());
                 Json uinfo;
                 uinfo["Username"] = userinfo->username;
@@ -273,7 +312,7 @@ int main(){
         userinfo->password = password;
         userinfo->resp = resp;
         series->set_context(userinfo);
-        // ÔÚĞòÁĞµÄ»Øµ÷º¯ÊıÖĞÊÍ·Å
+        // åœ¨åºåˆ—çš„å›è°ƒå‡½æ•°ä¸­é‡Šæ”¾
         series->set_callback([series](const SeriesWork *series){
             // delete;
             UserInfo *userinfo = static_cast<UserInfo *> (series_of()->get_context());
@@ -282,18 +321,18 @@ int main(){
         });
         
     });
-    // ÓÃÀ´Ë¢ĞÂ ²éÑ¯ÓÃ»§ĞÅÏ¢
+    // ç”¨æ¥åˆ·æ–° æŸ¥è¯¢ç”¨æˆ·ä¿¡æ¯
     server.POST("/user/info", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
-        // ²éÑ¯ÓÃ»§ĞÅÏ¢ĞèÒªÓÃµ½Êı¾İ¿â ËùÒÔĞèÒªmysqlÈÎÎñ
-        // 1 ½âÎöÓÃ»§ÇëÇó
+        // æŸ¥è¯¢ç”¨æˆ·ä¿¡æ¯éœ€è¦ç”¨åˆ°æ•°æ®åº“ æ‰€ä»¥éœ€è¦mysqlä»»åŠ¡
+        // 1 è§£æç”¨æˆ·è¯·æ±‚
         auto userInfo = req->query_list();
-        // 2 Ğ£ÑétokenÊÇ·ñºÏ·¨ ---> À¹½ØÆ÷
-        // 3 ¸ù¾İÓÃ»§ĞÅÏ¢£¬²éÑ¯sql
+        // 2 æ ¡éªŒtokenæ˜¯å¦åˆæ³• ---> æ‹¦æˆªå™¨
+        // 3 æ ¹æ®ç”¨æˆ·ä¿¡æ¯ï¼ŒæŸ¥è¯¢sql
         std::string sql = "SELECT user_name, signup_at FROM cloudisk.tbl_user WHERE user_name='" 
                           + userInfo["username"] + "' LIMIT 1;";
         auto mysqlTask = WFTaskFactory::create_mysql_task("mysql://root:123456@localhost", 0, [resp](WFMySQLTask *mysqlTask){
             auto respMysql = mysqlTask->get_resp();
-            // ×÷Îªµü´úÆ÷ »ñÈ¡½á¹û
+            // ä½œä¸ºè¿­ä»£å™¨ è·å–ç»“æœ
             protocol::MySQLResultCursor cursor(respMysql);
             std::vector<std::vector<protocol::MySQLCell>> rows;
             cursor.fetch_all(rows);
@@ -305,19 +344,19 @@ int main(){
             respInfo["data"] = uInfo;
             respInfo["code"] = 0;
             respInfo["msg"] = "OK";
-            // ·µ»Ø¸øÓÃ»§  ÕâÑùÒ³Ãæ¾ÍÄÜµ¯³öÓÃ»§µÄĞÅÏ¢
+            // è¿”å›ç»™ç”¨æˆ·  è¿™æ ·é¡µé¢å°±èƒ½å¼¹å‡ºç”¨æˆ·çš„ä¿¡æ¯
             resp->String(respInfo.dump());
         });
         mysqlTask->get_req()->set_query(sql);
         series->push_back(mysqlTask);
     });
     server.POST("/file/query", [](const wfrest::HttpReq *req, wfrest::HttpResp *resp, SeriesWork *series){
-        // ½âÎöÓÃ»§ÇëÇó
+        // è§£æç”¨æˆ·è¯·æ±‚
         auto userInfo = req->query_list();
         std::string username = userInfo["username"];
         auto form_kv = req->form_kv();
         std::string limit = form_kv["limit"];
-        // ¸ù¾İÓÃ»§Ãû²étbl_user_file
+        // æ ¹æ®ç”¨æˆ·åæŸ¥tbl_user_file
         std::string sql = "SELECT file_sha1,file_name,file_size,upload_at,last_update FROM cloudisk.tbl_user_file WHERE user_name = '"
                           + username + "' LIMIT " + limit + ";";
         fprintf(stderr, "sql = %s\n", sql.c_str());
