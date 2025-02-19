@@ -9,6 +9,8 @@
 #include <wfrest/HttpMsg.h>
 #include "UserInfo.h"
 #include "Token.h"
+#include "signup.srpc.h"
+
 static WFFacilities::WaitGroup waitGroup(1);
 using Json = nlohmann::json;
 void callback(WFMySQLTask *mysqlTask){
